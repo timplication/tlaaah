@@ -132,6 +132,108 @@ fn state_formula_and(subformula_1: String, subformula_2: String) -> String {
     )
 }
 
+fn state_formula_or(subformula_1: String, subformula_2: String) -> String {
+    format!(
+        "SELECT EXISTS ({}) OR EXISTS({})",
+        subformula_1, subformula_2
+    )
+}
+
+//
+// Everything below here needs some extra testing
+//
+fn state_formula_all(subformula: String, state_id: u64) -> String {
+    format!(
+        r"
+        WITH RECURSIVE paths(from_state, to_state, path) AS (
+           SELECT from_state, to_state, [from_state, to_state] AS path
+           FROM transition WHERE from_state = {}
+           UNION ALL
+           SELECT paths.from_state AS from_state, to_state,
+                  array_append(path, to_state) AS path
+           FROM paths JOIN transition ON paths.to_state = from_state
+           WHERE to_state != ALL(paths.path)
+        )
+        SELECT * FROM paths WHERE NOT EXISTS(
+           SELECT * FROM predicate EXCEPT {})
+        ",
+        state_id, subformula
+    )
+}
+
+fn state_formula_exists(subformula: String, state_id: u64) -> String {
+    format!(
+        r"
+        WITH RECURSIVE paths(from_state, to_state, path) AS (
+           SELECT from_state, to_state, [from_state, to_state] AS path
+           FROM transition WHERE from_state = {}
+           UNION ALL
+           SELECT paths.from_state AS from_state, to_state,
+                  array_append(path, to_state) AS path
+           FROM Paths JOIN Transition ON paths.to_state = from_state
+           WHERE to_state != ALL(paths.path)
+        )
+        SELECT * FROM paths WHERE EXISTS({})
+        ",
+        state_id, subformula
+    )
+}
+
+fn path_formula_next(subformula: String, path_start: u64) -> String {
+    format!(
+        r"
+       SELECT *
+       FROM transition t JOIN predicate p
+       ON t.to_state = p.state_id
+       WHERE EXISTS ({}) AND t.from_state = {}
+       ",
+        subformula, path_start
+    )
+}
+
+fn path_formula_future(subformula: String, path_start: u64) -> String {
+    format!(
+        r"
+        WITH RECURSIVE paths (from_state, to_state, path) AS (
+           SELECT from_state, to_state, [from_state, to_state] AS path
+           FROM transition WHERE from_state = {}
+           UNION ALL
+           SELECT paths.from_state AS from_state, to_state,
+                  array_append(path, to_state) AS path
+           FROM paths JOIN transition ON paths.to_state = from_state
+           WHERE to_state != ALL(Paths.path)
+        )
+        SELECT * FROM paths WHERE EXISTS({})
+        ",
+        path_start, subformula
+    )
+}
+
+fn path_formula_global(subformula: String, path_start: u64) -> String {
+    format!(
+        r"
+        WITH RECURSIVE paths(from_state, to_state, path) AS (
+           SELECT from_state, to_state, [from_state, to_state] AS path
+           FROM transition WHERE from_state = {}
+           UNION ALL
+           SELECT paths.from_state AS from_state, to_state,
+                  array_append(path, to_state) AS path
+           FROM Paths JOIN transition ON paths.to_state = from_state
+           WHERE to_state != ALL(paths.path)
+        )
+        SELECT * FROM paths WHERE NOT EXISTS(
+            SELECT * FROM predicate
+            EXCEPT {})
+        )
+        ",
+        path_start, subformula
+    )
+}
+
+fn path_formula_until(subformula_1: String, subformula_2: String) -> String {
+    todo!()
+}
+
 fn main() -> Result<()> {
     // TLA+ spec we are transcribing:
     //
