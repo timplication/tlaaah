@@ -1,0 +1,7 @@
+[package]
+name = "tlaaah"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+duckdb = { version = "0.8", features = ["bundled"] }
